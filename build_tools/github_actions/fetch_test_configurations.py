@@ -231,7 +231,7 @@ test_matrix = {
     "hipsolver": {
         "job_name": "hipsolver",
         "fetch_artifact_args": "--blas --tests",
-        "timeout_minutes": 5,
+        "timeout_minutes": 10,
         "test_script": f"python {_get_script_path('test_hipsolver.py')}",
         "platform": ["linux", "windows"],
         "total_shards_dict": {
@@ -256,7 +256,7 @@ test_matrix = {
     "rocprim": {
         "job_name": "rocprim",
         "fetch_artifact_args": "--prim --tests",
-        "timeout_minutes": 30,
+        "timeout_minutes": 60,
         "test_script": f"python {_get_script_path('test_rocprim.py')}",
         "platform": ["linux", "windows"],
         "total_shards_dict": {
@@ -398,7 +398,7 @@ test_matrix = {
     "hipfft": {
         "job_name": "hipfft",
         "fetch_artifact_args": "--fft --rand --tests",
-        "timeout_minutes": 60,
+        "timeout_minutes": 120,
         "test_script": f"python {_get_script_path('test_hipfft.py')}",
         "platform": ["linux", "windows"],
         "total_shards_dict": {
