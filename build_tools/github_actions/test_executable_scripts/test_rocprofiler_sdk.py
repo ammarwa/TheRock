@@ -4,6 +4,7 @@
 import logging
 import os
 import shlex
+import shutil
 import subprocess
 from pathlib import Path
 import sys
@@ -41,6 +42,40 @@ def setup_env():
     environ_vars["LD_LIBRARY_PATH"] = ":".join(
         [f"{THEROCK_LIB_PATH}", f"{THEROCK_SYSDEPS_LIB_PATH}"] + old_ld_lib_path
     )
+
+
+# TEMPORARY (throwaway validation): install an MPI implementation so
+# find_package(MPI) succeeds and the rocprofv3 mpi-ranks integration tests run
+# instead of being disabled. This is a best-effort shim to prove the mpi-ranks
+# tests pass in TheRock CI; the permanent solution is the dedicated
+# no_rocm_image_ubuntu24_04_rocprofiler container image. Safe to no-op when MPI
+# is already present or when apt is unavailable.
+def install_mpi():
+    if shutil.which("mpicc") and shutil.which("mpiexec"):
+        logging.info("++ MPI already present; skipping install")
+        return
+
+    apt_get = shutil.which("apt-get")
+    if not apt_get:
+        logging.warning(
+            "++ apt-get not found; skipping MPI install (mpi-ranks tests may be disabled)"
+        )
+        return
+
+    prefix = [] if os.geteuid() == 0 else ["sudo"]
+    packages = ["libopenmpi-dev", "openmpi-bin"]
+    try:
+        subprocess.run(prefix + [apt_get, "update"], check=True, env=environ_vars)
+        subprocess.run(
+            prefix + [apt_get, "install", "-y", "--no-install-recommends", *packages],
+            check=True,
+            env=environ_vars,
+        )
+        logging.info("++ Installed MPI: %s", ", ".join(packages))
+    except (subprocess.CalledProcessError, OSError) as exc:
+        logging.warning(
+            "++ MPI install failed (%s); mpi-ranks tests may be disabled", exc
+        )
 
 
 def cmake_config():
@@ -112,6 +147,7 @@ def execute_tests():
 
 if __name__ == "__main__":
     setup_env()
+    install_mpi()
     cmake_config()
     cmake_build()
     execute_tests()
