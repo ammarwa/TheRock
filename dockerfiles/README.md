@@ -101,6 +101,16 @@ This includes dejagnu, make, gcc, g++ and gfortran.
 Used in ocltst execution. It installs OCL ICD package required
 by ocltst
 
+| Source .Dockerfile                                                                                     | Published package                                                                     |
+| ------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------- |
+| [`no_rocm_image_ubuntu24_04_rocprofiler.Dockerfile`](no_rocm_image_ubuntu24_04_rocprofiler.Dockerfile) | https://github.com/ROCm/TheRock/pkgs/container/no_rocm_image_ubuntu24_04_rocprofiler |
+
+Extended version of no_rocm_image_ubuntu24_04.Dockerfile, adding an MPI
+implementation (`libopenmpi-dev`, `openmpi-bin`) so that find_package(MPI)
+succeeds when building the rocprofiler-sdk tests. This enables the rocprofv3
+mpi-ranks integration tests, which are otherwise disabled when no MPI is
+present.
+
 ### `rocm_runtime.Dockerfile`
 
 | Source .Dockerfile                                   | Published package |

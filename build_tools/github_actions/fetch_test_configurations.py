@@ -456,6 +456,14 @@ test_matrix = {
         ],
         "test_script": f"python {_get_script_path('test_rocprofiler_sdk.py')}",
         "platform": ["linux"],
+        # rocprofiler-sdk's rocprofv3 mpi-ranks integration tests require an MPI
+        # implementation so find_package(MPI) succeeds; without it those tests
+        # are disabled. OpenMPI is not bundled in TheRock artifacts and is
+        # provided via the specialized rocprofiler image.
+        # NOTE: currently pinned to the stage/docker/rocprofiler-mpi build; re-pin
+        # to the latest-tag digest once the Dockerfile lands on main (see
+        # dockerfiles/README.md "Updating images used by GitHub Actions").
+        "container_image": "ghcr.io/rocm/no_rocm_image_ubuntu24_04_rocprofiler@sha256:f709a70427a6bf4957357f836edab2971590381bc1cf55820f11441f876bcaad",
         "container_options": ["--cap-add=SYS_PTRACE"],
         "total_shards_dict": {
             "linux": 1,
