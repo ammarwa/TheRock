@@ -101,8 +101,8 @@ This includes dejagnu, make, gcc, g++ and gfortran.
 Used in ocltst execution. It installs OCL ICD package required
 by ocltst
 
-| Source .Dockerfile                                                                                     | Published package                                                                     |
-| ------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------- |
+| Source .Dockerfile                                                                                     | Published package                                                                    |
+| ------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------ |
 | [`no_rocm_image_ubuntu24_04_rocprofiler.Dockerfile`](no_rocm_image_ubuntu24_04_rocprofiler.Dockerfile) | https://github.com/ROCm/TheRock/pkgs/container/no_rocm_image_ubuntu24_04_rocprofiler |
 
 Extended version of no_rocm_image_ubuntu24_04.Dockerfile, adding an MPI
