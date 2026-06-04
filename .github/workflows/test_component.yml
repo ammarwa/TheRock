@@ -155,6 +155,9 @@ jobs:
           TEST_TYPE: ${{ fromJSON(inputs.component).test_type }}
           TEST_COMPONENT: ${{ fromJSON(inputs.component).job_name }}
           ROCM_KPACK_DEBUG: "1"
+          # GFX 110X cannot run privileged set/write amdsmi tests. Opt into
+          # non-privileged mode so detect_asic_filter.sh excludes them.
+          AMDSMI_NON_PRIVILEGED: ${{ (fromJSON(inputs.component).job_name == 'amdsmi' && startsWith(inputs.amdgpu_families, 'gfx110X')) && '1' || '' }}
         run: |
           python ./build_tools/memory_monitor.py --phase "Test ${{ fromJSON(inputs.component).job_name }}" -- \
             bash -c '${{ fromJSON(inputs.component).test_script }}'

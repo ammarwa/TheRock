@@ -19,14 +19,22 @@ Usage:
 ===============================================================================
 """
 
-import pytest
-
-pytestmark = pytest.mark.skip("Manual execution only — requires GPU device access")
 import logging
 import os
+import pytest
 import shlex
 import subprocess
 from pathlib import Path
+
+# Non-privileged mode (e.g. GFX 110X CI) opts out of privileged set/write tests.
+# When enabled, detect_asic_filter.sh appends FILTER[non_privileged] to the
+# gtest exclude list, so this entry point may run unprivileged. Otherwise the
+# suite requires privileged GPU device access and stays skipped under pytest.
+NON_PRIVILEGED = bool(os.getenv("AMDSMI_NON_PRIVILEGED"))
+if not NON_PRIVILEGED:
+    pytestmark = pytest.mark.skip(
+        "Manual execution only — requires GPU device access"
+    )
 
 logging.basicConfig(level=logging.INFO)
 
