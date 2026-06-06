@@ -120,8 +120,93 @@ jobs:
           echo "torch_version=${TORCH_VERSION}" >> "$GITHUB_OUTPUT"
           echo "Resolved torch_version: ${TORCH_VERSION}"
 
-  run_full_tests:
+  warmup_inductor_cache:
     needs: resolve_torch_version
+    # Run whenever default or inductor configs are present — both run torch.compile-heavy
+    # tests and benefit from a pre-warmed kernel cache. Skip for distributed-only runs.
+    if: >-
+      ${{ contains(inputs.test_configs || 'default distributed inductor', 'inductor') ||
+          contains(inputs.test_configs || 'default distributed inductor', 'default') }}
+    runs-on: ${{ inputs.test_runs_on || 'linux-gfx942-1gpu-core42-ossci-rocm' }}
+    container:
+      image: ghcr.io/rocm/no_rocm_image_ubuntu24_04@sha256:405945a40deaff9db90b9839c0f41d4cba4a383c1a7459b28627047bf6302a26
+      options: --shm-size=4g
+        --cap-add=SYS_PTRACE
+        --group-add video
+        --device /dev/kfd
+        --device /dev/dri
+        --group-add 992
+        --group-add 110
+        --env-file /etc/podinfo/gha-gpu-isolation-settings
+        --user 0:0
+    defaults:
+      run:
+        shell: bash
+    env:
+      AMDGPU_FAMILY: ${{ inputs.amdgpu_family || 'gfx94X-dcgpu' }}
+    outputs:
+      cache_artifact_name: ${{ steps.set_name.outputs.name }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Set up Python
+        uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6.2.0
+        with:
+          python-version: ${{ inputs.python_version || '3.12' }}
+
+      - name: Install torch wheel
+        timeout-minutes: 15
+        run: |
+          python build_tools/setup_venv.py .venv \
+            --packages torch==${{ needs.resolve_torch_version.outputs.torch_version }} \
+            --index-url=${{ inputs.package_index_url || 'https://rocm.nightlies.amd.com/v2-staging' }} \
+            --index-subdir=${{ inputs.amdgpu_family || 'gfx94X-dcgpu' }} \
+            --activate-in-future-github-actions-steps
+
+      - name: Install ROCm devel packages
+        timeout-minutes: 15
+        run: |
+          pip install "rocm[devel]" \
+            --index-url=${{ inputs.package_index_url || 'https://rocm.nightlies.amd.com/v2-staging' }}/${{ inputs.amdgpu_family || 'gfx94X-dcgpu' }}
+
+      - name: Initialize ROCm SDK
+        run: |
+          rocm-sdk init
+          ROCM_HOME="$(rocm-sdk path --root)"
+          ROCM_BIN="$(rocm-sdk path --bin)"
+          echo "${ROCM_BIN}" >> "${GITHUB_PATH}"
+          echo "ROCM_PATH=${ROCM_HOME}" >> "${GITHUB_ENV}"
+          echo "ROCM_HOME=${ROCM_HOME}" >> "${GITHUB_ENV}"
+          echo "HIP_DEVICE_LIB_PATH=${ROCM_HOME}/lib/llvm/amdgcn/bitcode" >> "${GITHUB_ENV}"
+          echo "LD_LIBRARY_PATH=${ROCM_HOME}/lib/host-math/lib:${LD_LIBRARY_PATH:-}" >> "${GITHUB_ENV}"
+
+      - name: Set artifact name output
+        id: set_name
+        run: |
+          # Sanitize torch_version: replace '+' with '-' (artifact names cannot contain '+')
+          TORCH_VER="${{ needs.resolve_torch_version.outputs.torch_version }}"
+          NAME="inductor-cache-${{ inputs.amdgpu_family || 'gfx94X-dcgpu' }}-${TORCH_VER//+/-}"
+          echo "name=${NAME}" >> "${GITHUB_OUTPUT}"
+
+      - name: Run inductor warmup
+        timeout-minutes: 30
+        run: |
+          python external-builds/pytorch/warmup_inductor_cache.py \
+            --output /tmp/cache_artifacts.bin \
+            --device cuda
+
+      - name: Upload inductor cache artifact
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: ${{ steps.set_name.outputs.name }}
+          path: /tmp/cache_artifacts.bin
+          retention-days: 1
+
+  run_full_tests:
+    needs: [resolve_torch_version, warmup_inductor_cache]
+    # warmup_inductor_cache may be skipped (non-inductor runs); allow test to proceed.
+    if: ${{ always() && needs.resolve_torch_version.result == 'success' }}
     uses: ./.github/workflows/test_pytorch_wheels_full.yml
     with:
       amdgpu_family: ${{ inputs.amdgpu_family || 'gfx94X-dcgpu' }}
@@ -134,3 +219,4 @@ jobs:
       pytorch_git_ref: ${{ inputs.pytorch_git_ref || 'nightly' }}
       test_configs: ${{ inputs.test_configs || 'default distributed inductor' }}
       tests_to_include: ""
+      inductor_cache_artifact: ${{ needs.warmup_inductor_cache.outputs.cache_artifact_name || '' }}

@@ -73,6 +73,15 @@ on:
           - "single"
           - "all"
         default: "auto"
+      inductor_cache_artifact:
+        description: >-
+          Name of a GitHub Actions artifact containing serialized inductor cache
+          artifacts (produced by warmup_inductor_cache.py). When set, each test
+          shard downloads the artifact and calls
+          torch.compiler.load_cache_artifacts() before running tests, reducing
+          Triton/HIP kernel JIT time. Leave empty to skip (cold cache).
+        type: string
+        default: ""
       multi_arch:
         description: >-
           Install from a multi-arch index using device extras
@@ -138,6 +147,12 @@ on:
           GPUs visible at once; "auto": derive from the test config.
         type: string
         default: "auto"
+      inductor_cache_artifact:
+        description: >-
+          Name of a GitHub Actions artifact containing serialized inductor cache
+          artifacts. Leave empty to skip (cold cache).
+        type: string
+        default: ""
 
 permissions:
   contents: read
@@ -329,6 +344,30 @@ jobs:
           python -m pip install -r external-builds/pytorch/requirements-test.txt
           python -m pip install -r external-builds/pytorch/pytorch/.ci/docker/requirements-ci.txt
           pip freeze
+
+      - name: Download inductor cache artifact
+        if: ${{ inputs.inductor_cache_artifact != '' }}
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: ${{ inputs.inductor_cache_artifact }}
+          path: /tmp/inductor-cache
+
+      - name: Load inductor cache artifacts
+        if: ${{ inputs.inductor_cache_artifact != '' }}
+        run: |
+          CACHE_FILE="/tmp/inductor-cache/cache_artifacts.bin"
+          if [ ! -s "${CACHE_FILE}" ]; then
+            echo "Inductor cache artifact is empty or missing — skipping load."
+            exit 0
+          fi
+          python - <<'EOF'
+          import sys
+          from pathlib import Path
+          import torch
+          data = Path("/tmp/inductor-cache/cache_artifacts.bin").read_bytes()
+          torch.compiler.load_cache_artifacts(data)
+          print(f"Loaded {len(data):,} bytes of inductor cache artifacts")
+          EOF
 
       - name: Runner health status
         run: |
