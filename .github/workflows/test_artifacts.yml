@@ -34,6 +34,10 @@ on:
       windows_hip_rocr_tests:
         type: string
         default: 'false'
+      build_variant:
+        description: 'Build variant (e.g., "release", "asan", "tsan")'
+        type: string
+        default: "release"
       release_type:
         description: 'Release type: "ci" or "dev".'
         type: choice
@@ -77,6 +81,9 @@ on:
       windows_hip_rocr_tests:
         type: string
         default: 'false'
+      build_variant:
+        type: string
+        default: "release"
       release_type:
         type: string
         default: ci
@@ -154,6 +161,7 @@ jobs:
       artifact_group: ${{ inputs.artifact_group }}
       amdgpu_families: ${{ inputs.amdgpu_families }}
       amdgpu_targets: ${{ inputs.amdgpu_targets }}
+      build_variant: ${{ inputs.build_variant }}
       test_runs_on: ${{ inputs.test_runs_on }}
       platform: ${{ needs.configure_test_matrix.outputs.platform }}
       component: ${{ needs.configure_test_matrix.outputs.sanity_component }}
@@ -187,6 +195,7 @@ jobs:
       artifact_group: ${{ inputs.artifact_group }}
       amdgpu_families: ${{ inputs.amdgpu_families }}
       amdgpu_targets: ${{ inputs.amdgpu_targets }}
+      build_variant: ${{ inputs.build_variant }}
       # Route to the appropriate runner:
       #   1. Benchmark components use the dedicated benchmark runner
       #   2. Multi-GPU components use the multi-GPU runner
