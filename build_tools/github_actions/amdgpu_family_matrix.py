@@ -83,14 +83,15 @@ amdgpu_family_info_matrix_presubmit = {
     },
     "gfx110x": {
         "linux": {
-            # TODO(#3298): Re-enable machine once HSA_STATUS_ERROR_OUT_OF_RESOURCES issues are resolved
-            # Label is linux-gfx110X-gpu-rocm, fetch-gfx-targets should be ["gfx1100"]
-            "test-runs-on": "",
+            # Re-enabled for amdsmi non-privileged CI (gfx110X).
+            # See TODO(#3298): watch for HSA_STATUS_ERROR_OUT_OF_RESOURCES.
+            "test-runs-on": "linux-gfx110X-gpu-rocm",
             "family": "gfx110X-all",
-            "fetch-gfx-targets": [],
+            "fetch-gfx-targets": ["gfx1100"],
             "bypass_tests_for_releases": True,
             "build_variants": ["release"],
-            "sanity_check_only_for_family": True,
+            # Run full component tests (amdsmi) on gfx110X, not sanity-only.
+            "sanity_check_only_for_family": False,
         },
         "windows": {
             "test-runs-on": "windows-gfx110X-gpu-rocm",
