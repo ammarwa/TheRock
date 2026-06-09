@@ -62,6 +62,27 @@ if(THEROCK_ENABLE_MIRAGE)
   # binary. Building the dashboard SPA requires Node.js 20.19+ and npm on PATH.
   ##############################################################################
 
+  # mirage is a Rust workspace whose dashboard build step shells out to
+  # node/npm. Provision local cargo + Node.js toolchains when the host lacks
+  # them so the build is self-contained. The provisioning script emits a cargo
+  # wrapper that prepends the resolved node/cargo bin dirs to PATH; pointing
+  # MIRAGE_CARGO at it makes every cargo build/test invocation find node/npm.
+  set(_mirage_toolchain_dir "${CMAKE_CURRENT_BINARY_DIR}/mirage-toolchains")
+  set(_mirage_cargo_wrapper "${_mirage_toolchain_dir}/bin/cargo")
+  add_custom_command(
+    OUTPUT "${_mirage_cargo_wrapper}"
+    COMMAND "${Python3_EXECUTABLE}"
+        "${THEROCK_SOURCE_DIR}/build_tools/provision_mirage_toolchains.py"
+        --toolchain-dir "${_mirage_toolchain_dir}"
+        --wrapper "${_mirage_cargo_wrapper}"
+    DEPENDS "${THEROCK_SOURCE_DIR}/build_tools/provision_mirage_toolchains.py"
+    COMMENT "Provisioning mirage cargo/node toolchains"
+    VERBATIM
+  )
+  add_custom_target(therock-mirage-toolchains
+    DEPENDS "${_mirage_cargo_wrapper}"
+  )
+
   therock_cmake_subproject_declare(mirage
     DISABLE_AMDGPU_TARGETS
     NO_MERGE_COMPILE_COMMANDS
@@ -69,6 +90,9 @@ if(THEROCK_ENABLE_MIRAGE)
     BINARY_DIR "${CMAKE_CURRENT_BINARY_DIR}/mirage"
     CMAKE_ARGS
       -DMIRAGE_CARGO_PROFILE=release
+      "-DMIRAGE_CARGO=${_mirage_cargo_wrapper}"
+    EXTRA_DEPENDS
+      therock-mirage-toolchains
   )
 
   therock_cmake_subproject_activate(mirage)
