@@ -2,22 +2,22 @@
 # Copyright Advanced Micro Devices, Inc.
 # SPDX-License-Identifier: MIT
 
-"""Upload PyTorch wheels from a local directory to release-bucket staging.
+"""Upload multi-arch PyTorch wheels from a local directory to a release bucket.
 
-Used by the multi-arch release PyTorch wheels workflow to push the
+Used by the multi-arch release PyTorch wheels workflows to push the
 host wheel and per-gfx amd-torch-device-* wheels produced by the kpack
-splitter into the release bucket's staging path.
+splitter into the release bucket.
 
 Example with ``--source-dir /tmp/dist --release-type dev``::
 
     /tmp/dist/torch-2.10.0+rocm7.10.0-cp312-cp312-linux_x86_64.whl
     /tmp/dist/amd-torch-device-gfx942-2.10.0+rocm7.10.0-py3-none-linux_x86_64.whl
-      -> s3://therock-dev-python/v4/whl-staging/torch-...whl
-      -> s3://therock-dev-python/v4/whl-staging/amd-torch-device-...whl
+      -> s3://therock-dev-python/v4/whl/torch-...whl
+      -> s3://therock-dev-python/v4/whl/amd-torch-device-...whl
 
 Test usage::
 
-    python build_tools/github_actions/publish_pytorch_to_staging.py \\
+    python build_tools/github_actions/publish_pytorch_to_release_bucket.py \\
         --source-dir /tmp/dist --release-type dev --dry-run
 """
 
@@ -32,13 +32,23 @@ sys.path.insert(0, str(_BUILD_TOOLS_DIR))
 from _therock_utils.s3_buckets import get_release_bucket_config
 from _therock_utils.storage_backend import create_storage_backend
 from _therock_utils.storage_location import StorageLocation
+from github_actions.github_actions_api import gha_set_output
 
 logger = logging.getLogger(__name__)
 
 
+MULTI_ARCH_INDEX_URLS = {
+    # TODO: Move this release bucket to CDN/index URL mapping into
+    # build_tools/_therock_utils/s3_buckets.py.
+    "dev": "https://rocm.devreleases.amd.com/whl-multi-arch/",
+    "nightly": "https://rocm.nightlies.amd.com/whl-multi-arch/",
+    "prerelease": "https://rocm.prereleases.amd.com/whl-multi-arch/",
+}
+
+
 def main(argv: list[str]) -> None:
     parser = argparse.ArgumentParser(
-        description="Upload PyTorch wheels to release-bucket staging"
+        description="Upload multi-arch PyTorch wheels to a release bucket"
     )
     parser.add_argument(
         "--source-dir",
@@ -61,7 +71,7 @@ def main(argv: list[str]) -> None:
         raise FileNotFoundError(f"Source directory not found: {args.source_dir}")
 
     bucket = get_release_bucket_config(args.release_type, "python")
-    s3_subdir = "v4/whl-staging"
+    s3_subdir = "v4/whl"
     dest = StorageLocation(bucket.name, s3_subdir)
     backend = create_storage_backend(dry_run=args.dry_run)
 
@@ -70,6 +80,7 @@ def main(argv: list[str]) -> None:
     logger.info("Uploaded %d wheel files", count)
     if count == 0:
         raise FileNotFoundError(f"No wheels found at {args.source_dir}")
+    gha_set_output({"package_index_url": MULTI_ARCH_INDEX_URLS[args.release_type]})
 
 
 if __name__ == "__main__":
