@@ -143,6 +143,7 @@ class CIInputs:
     # Prebuilt configuration (from workflow_dispatch)
     prebuilt_stages: str = ""
     baseline_run_id: str = ""
+    build_only: bool = False
 
     def log(self) -> None:
         """Log parsed inputs for CI diagnostics."""
@@ -226,6 +227,7 @@ class CIInputs:
             windows_test_labels=windows_test_labels,
             prebuilt_stages=os.environ.get("PREBUILT_STAGES", ""),
             baseline_run_id=os.environ.get("BASELINE_RUN_ID", ""),
+            build_only=os.environ.get("BUILD_ONLY", "").lower() == "true",
         )
 
 
@@ -437,6 +439,7 @@ class BuildConfig:
     # Cross-platform pair, populated identically in linux and windows configs.
     linux_amdgpu_families: str = ""  # Semicolon-separated
     windows_amdgpu_families: str = ""  # Semicolon-separated
+    build_only: bool = False
 
     def to_dict(self) -> dict:
         d = asdict(self)
@@ -825,6 +828,7 @@ def _expand_build_config_for_platform(
     is_workflow_dispatch: bool,
     prebuilt_stages: list[str] | None = None,
     baseline_run_id: str = "",
+    build_only: bool = False,
 ) -> BuildConfig | None:
     """Build a BuildConfig for one platform, or None if no families match.
 
@@ -958,13 +962,17 @@ def _expand_build_config_for_platform(
         build_variant_suffix=suffix,
         build_variant_cmake_preset=variant_config["build_variant_cmake_preset"],
         expect_failure=expect_failure,
-        build_native_linux=(not expect_failure and suffix != "asan"),
+        build_native_linux=(not expect_failure and suffix != "asan" and not build_only),
         build_pytorch=(
-            not expect_failure and not expect_pytorch_failure and suffix != "asan"
+            not expect_failure
+            and not expect_pytorch_failure
+            and suffix != "asan"
+            and not build_only
         ),
         build_runs_on=build_runs_on,
         prebuilt_stages=prebuilt_stages or [],
         baseline_run_id=baseline_run_id,
+        build_only=build_only,
     )
 
 
@@ -974,6 +982,7 @@ def expand_build_configs(
     test_type: str,
     prebuilt_stages: list[str] | None = None,
     baseline_run_id: str = "",
+    build_only: bool = False,
 ) -> BuildConfigs:
     """Build a BuildConfig for each platform that supports the variant.
 
@@ -1014,6 +1023,7 @@ def expand_build_configs(
             is_workflow_dispatch=ci_inputs.is_workflow_dispatch,
             prebuilt_stages=prebuilt_stages,
             baseline_run_id=baseline_run_id,
+            build_only=build_only,
         )
         if platform == "linux":
             linux_config = config
@@ -1119,6 +1129,7 @@ def configure(ci_inputs: CIInputs, git_context: GitContext) -> CIOutputs:
         test_type=jobs.test_rocm.test_type,
         prebuilt_stages=jobs.build_rocm.prebuilt_stages,
         baseline_run_id=jobs.build_rocm.baseline_run_id,
+        build_only=ci_inputs.build_only,
     )
     builds.log()
 
