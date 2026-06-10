@@ -672,7 +672,7 @@ test_matrix = {
 }
 
 
-def run():
+def run(external_config=None):
     platform = os.getenv("RUNNER_OS").lower()
     projects_to_test = os.getenv("PROJECTS_TO_TEST", "*")
     amdgpu_families = os.getenv("AMDGPU_FAMILIES")
@@ -800,7 +800,8 @@ def run():
             # If the multi GPU test runner is not enabled, we will skip the test
             if "multi_gpu" in selected_matrix[key]:
                 amdgpu_families_matrix = get_all_families_for_trigger_types(
-                    ["presubmit", "postsubmit", "nightly"]
+                    ["presubmit", "postsubmit", "nightly"],
+                    external_config=external_config,
                 )
                 if (
                     platform in selected_matrix[key]["multi_gpu"]
@@ -855,4 +856,5 @@ def run():
 
 
 if __name__ == "__main__":
-    run()
+    external_config = load_external_config()
+    run(external_config=external_config)
