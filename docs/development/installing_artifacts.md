@@ -37,6 +37,7 @@ Choose one of these options to specify where to install from:
 | `--fft`         | Flag | Include FFT artifacts                              |
 | `--hipdnn`      | Flag | Include hipDNN artifacts                           |
 | `--libhipcxx`   | Flag | Include libhipcxx artifacts                        |
+| `--hipthreads`  | Flag | Include hipThreads artifacts                       |
 | `--miopen`      | Flag | Include MIOpen artifacts                           |
 | `--prim`        | Flag | Include primitives artifacts                       |
 | `--rand`        | Flag | Include random number generator artifacts          |
