@@ -39,6 +39,10 @@ on:
         description: PyTorch ref to checkout. (typically "nightly", or "release/X.Y")
         required: true
         type: string
+      pytorch_git_repo:
+        description: "PyTorch git repo to checkout sources from (e.g. ROCm/pytorch, yourfork/pytorch)"
+        type: string
+        default: "ROCm/pytorch"
       cache_type:
         description: "Compiler cache type (sccache, ccache, or none)"
         required: false
@@ -98,10 +102,14 @@ on:
         description: ROCm version to pip install (e.g. "7.10.0a20251124")
         type: string
       pytorch_git_ref:
-        description: PyTorch ref to checkout. (typically "nightly", or "release/X.Y")
+        description: PyTorch ref to checkout. (typically "nightly", or "release/X.Y", or your branch name)
         required: true
         type: string
         default: "release/2.10"
+      pytorch_git_repo:
+        description: "PyTorch git repo to checkout sources from (e.g. ROCm/pytorch, yourfork/pytorch)"
+        type: string
+        default: "ROCm/pytorch"
       cache_type:
         description: "Compiler cache type"
         type: choice
@@ -195,11 +203,11 @@ jobs:
           ./external-builds/pytorch/pytorch_vision_repo.py checkout --repo-hashtag nightly --no-commit-hipify
           ./external-builds/pytorch/pytorch_triton_repo.py checkout --no-commit-hipify
 
-      # Checkout stable sources from https://github.com/ROCm/pytorch
+      # Checkout stable sources from the requested PyTorch repo (default ROCm/pytorch)
       - name: Checkout PyTorch Source Repos from stable branch
         if: ${{ inputs.pytorch_git_ref != 'nightly' }}
         run: |
-          ./external-builds/pytorch/pytorch_torch_repo.py checkout --gitrepo-origin https://github.com/ROCm/pytorch.git --repo-hashtag ${{ inputs.pytorch_git_ref }} --no-commit-hipify
+          ./external-builds/pytorch/pytorch_torch_repo.py checkout --gitrepo-origin https://github.com/${{ inputs.pytorch_git_repo }}.git --repo-hashtag ${{ inputs.pytorch_git_ref }} --no-commit-hipify
           ./external-builds/pytorch/pytorch_audio_repo.py checkout --require-related-commit --no-commit-hipify
           ./external-builds/pytorch/pytorch_apex_repo.py checkout --require-related-commit --no-commit-hipify
           ./external-builds/pytorch/pytorch_vision_repo.py checkout --require-related-commit --no-commit-hipify
