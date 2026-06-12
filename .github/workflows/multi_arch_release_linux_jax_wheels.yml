@@ -12,15 +12,15 @@ on:
   workflow_call:
     inputs:
       release_type:
-        description: 'Release type. Currently restricted to dev.'
+        description: "Release type. Currently restricted to dev."
         type: string
         default: dev
       rocm_version:
-        description: ROCm package version to build against.
+        description: "ROCm package version to build against."
         type: string
         required: true
       tar_url:
-        description: URL to the TheRock tarball used for the build.
+        description: "URL to the TheRock tarball used for the build."
         type: string
         required: true
       repository:
@@ -34,17 +34,17 @@ on:
   workflow_dispatch:
     inputs:
       release_type:
-        description: 'Release type; developer-triggered jobs should use "dev"'
+        description: 'Release type; developer-triggered jobs should use "dev".'
         type: choice
         options:
           - dev
         default: dev
       rocm_version:
-        description: ROCm package version to build against.
+        description: "ROCm package version to build against."
         type: string
         required: true
       tar_url:
-        description: URL to the TheRock tarball used for the build.
+        description: "URL to the TheRock tarball used for the build."
         type: string
         required: true
       repository:
@@ -52,11 +52,11 @@ on:
         type: string
         default: ""
       ref:
-        description: "Branch, tag, or SHA to checkout"
+        description: "Branch, tag, or SHA to checkout."
         type: string
         default: ""
 
-run-name: Release Linux JAX Wheels (${{ inputs.release_type }}, ${{ inputs.rocm_version }}, Multiarch)
+run-name: Multi-Arch Release Linux JAX Wheels (${{ inputs.release_type }}, ${{ inputs.rocm_version }}, Multiarch)
 
 permissions:
   contents: read

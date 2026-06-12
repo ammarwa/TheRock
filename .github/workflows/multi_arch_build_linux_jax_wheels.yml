@@ -18,40 +18,40 @@ on:
   workflow_call:
     inputs:
       python_version:
-        description: Python version to build wheels for.
+        description: "Python version to build wheels for."
         type: string
         required: true
       jax_ref:
-        description: JAX / rocm-jax release ref.
+        description: "JAX / rocm-jax release ref."
         type: string
         required: true
       build_jaxlib:
-        description: Whether this matrix cell should build jaxlib from JAX source.
+        description: "Whether this matrix cell should build jaxlib from JAX source."
         type: boolean
         required: true
       rocm_version:
-        description: ROCm package version to install and build against.
+        description: "ROCm package version to install and build against."
         type: string
         required: true
       tar_url:
-        description: URL to the TheRock tarball used for the build.
+        description: "URL to the TheRock tarball used for the build."
         type: string
         required: true
       release_type:
-        description: Release type.
+        description: "Release type."
         type: string
         required: true
       repository:
-        description: Repository to checkout. Defaults to github.repository.
+        description: "Repository to checkout. Defaults to github.repository."
         type: string
         default: ""
       ref:
-        description: Branch, tag, or SHA to checkout. Defaults to the triggering ref.
+        description: "Branch, tag, or SHA to checkout. Defaults to the triggering ref."
         type: string
         default: ""
     outputs:
       package_index_url:
-        description: Package index URL for the multi-arch release bucket.
+        description: "Package index URL for the multi-arch release bucket."
         value: ${{ jobs.build_jax_wheels.outputs.package_index_url }}
 
 permissions:
