@@ -17,6 +17,10 @@ name: Multi-Arch Build Linux JAX Wheels
 on:
   workflow_call:
     inputs:
+      amdgpu_family:
+        description: "Representative GPU family to use for JAX tests."
+        type: string
+        default: "gfx94X-dcgpu"
       python_version:
         description: "Python version to build wheels for."
         type: string
@@ -41,10 +45,6 @@ on:
         description: "Release type."
         type: string
         required: true
-      test_runs_on:
-        description: "Runner label to use for JAX tests."
-        type: string
-        default: "linux-gfx942-1gpu-core42-ossci-rocm"
       repository:
         description: "Repository to checkout. Defaults to github.repository."
         type: string
@@ -65,6 +65,44 @@ on:
         value: ${{ jobs.build_jax_wheels.outputs.jax_plugin_version }}
       jax_pjrt_version:
         value: ${{ jobs.build_jax_wheels.outputs.jax_pjrt_version }}
+  workflow_dispatch:
+    inputs:
+      amdgpu_family:
+        description: "Representative GPU family to use for JAX tests."
+        type: string
+        default: "gfx94X-dcgpu"
+      python_version:
+        description: "Python version to build wheels for."
+        type: string
+        required: true
+      jax_ref:
+        description: "JAX / rocm-jax release ref."
+        type: string
+        required: true
+      build_jaxlib:
+        description: "Whether this matrix cell should build jaxlib from JAX source."
+        type: boolean
+        required: true
+      rocm_version:
+        description: "ROCm package version to install and build against."
+        type: string
+        required: true
+      tar_url:
+        description: "URL to the TheRock tarball used for the build."
+        type: string
+        required: true
+      release_type:
+        description: "Release type."
+        type: string
+        required: true
+      repository:
+        description: "Repository to checkout. Defaults to github.repository."
+        type: string
+        default: ""
+      ref:
+        description: "Branch, tag, or SHA to checkout. Defaults to the triggering ref."
+        type: string
+        default: ""
 
 run-name: Build Multi-Arch Linux JAX Wheels (${{ inputs.release_type }}, ${{ inputs.rocm_version }}, Multiarch)
 
@@ -178,7 +216,7 @@ jobs:
       - name: Generating target to run
         id: configure
         env:
-          TARGET: gfx94X-dcgpu
+          TARGET: ${{ inputs.amdgpu_family }}
           PLATFORM: linux
         run: python ./build_tools/github_actions/configure_target_run.py
 
@@ -190,6 +228,7 @@ jobs:
       packages: read
     uses: ./.github/workflows/test_linux_jax_wheels.yml
     with:
+      amdgpu_family: ${{ inputs.amdgpu_family }}
       package_index_url: ${{ needs.build_jax_wheels.outputs.package_index_url }}
       rocm_version: ${{ inputs.rocm_version }}
       tar_url: ${{ inputs.tar_url }}

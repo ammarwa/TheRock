@@ -11,6 +11,10 @@ name: Multi-Arch Release Linux JAX Wheels
 on:
   workflow_call:
     inputs:
+      amdgpu_family:
+        description: "Representative GPU family to use for JAX tests."
+        type: string
+        default: "gfx94X-dcgpu"
       release_type:
         description: 'Release type: "dev", "nightly", or "prerelease".'
         type: string
@@ -33,6 +37,10 @@ on:
         default: ""
   workflow_dispatch:
     inputs:
+      amdgpu_family:
+        description: "Representative GPU family to use for JAX tests."
+        type: string
+        default: "gfx94X-dcgpu"
       release_type:
         description: 'Release type; developer-triggered jobs should use "dev".'
         type: choice
@@ -88,6 +96,7 @@ jobs:
       packages: read
     uses: ./.github/workflows/multi_arch_build_linux_jax_wheels.yml
     with:
+      amdgpu_family: ${{ inputs.amdgpu_family }}
       python_version: ${{ matrix.python_version }}
       jax_ref: ${{ matrix.jax_ref }}
       build_jaxlib: ${{ matrix.build_jaxlib }}
