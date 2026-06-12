@@ -15,7 +15,6 @@ on:
         description: 'Release type. Currently restricted to dev.'
         type: string
         default: dev
-        required: true
       rocm_version:
         description: ROCm package version to build against.
         type: string
