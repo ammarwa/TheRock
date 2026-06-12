@@ -72,6 +72,27 @@ def load_kpack_from_manifest(artifacts_dir: Path) -> bool:
     return False
 
 
+def build_artifact_catalog(artifact_dir) -> ArtifactCatalog:
+    """Build an ArtifactCatalog for the given directory, validating existence.
+
+    Parameters:
+        artifact_dir : The path to the artifacts directory
+
+    Returns:
+        ArtifactCatalog: Catalog of exploded artifacts found in the directory
+
+    Raises:
+        ValueError: If artifact directory does not exist
+    """
+    artifact_dir = Path(artifact_dir)
+
+    if not artifact_dir.exists() or not artifact_dir.is_dir():
+        raise ValueError(f"Artifact directory does not exist: {artifact_dir}")
+
+    # Use ArtifactCatalog from _therock_utils to scan the directory
+    return ArtifactCatalog(artifact_dir)
+
+
 def get_all_target_families(artifact_dir):
     """Extract the list of GFX architectures from artifact directory.
 
@@ -88,14 +109,48 @@ def get_all_target_families(artifact_dir):
     Raises:
         ValueError: If artifact directory does not exist
     """
-    artifact_dir = Path(artifact_dir)
+    return sorted(build_artifact_catalog(artifact_dir).all_target_families)
 
-    if not artifact_dir.exists() or not artifact_dir.is_dir():
-        raise ValueError(f"Artifact directory does not exist: {artifact_dir}")
 
-    # Use ArtifactCatalog from _therock_utils to get all target families
-    catalog = ArtifactCatalog(artifact_dir)
-    return sorted(catalog.all_target_families)
+def selection_needs_content_artifacts(pkg_list) -> bool:
+    """Return True if any selected package needs real content artifacts.
+
+    A package needs content artifacts when it declares an "Artifactory" entry in
+    package.json. Metapackages have no "Artifactory" key and therefore do not
+    require any artifacts of their own.
+
+    Parameters:
+        pkg_list : List of package names selected for the build
+
+    Returns:
+        bool : True if at least one selected package requires content artifacts
+    """
+    for pkg in pkg_list:
+        pkg_info = get_package_info(pkg, raise_if_missing=False)
+        if pkg_info and pkg_info.get("Artifactory"):
+            return True
+    return False
+
+
+def selection_needs_targets(pkg_list, enable_kpack: bool) -> bool:
+    """Return True if any selected package requires a GFX target architecture.
+
+    Gfxarch packages (including gfxarch metapackages) need at least one target to
+    produce architecture-specific (device) variants or to expand arch-specific
+    metapackage dependencies. Pure non-gfxarch packages do not.
+
+    Parameters:
+        pkg_list : List of package names selected for the build
+        enable_kpack : Whether multi-architecture (kpack) mode is enabled
+
+    Returns:
+        bool : True if at least one selected package requires a target
+    """
+    for pkg in pkg_list:
+        pkg_info = get_package_info(pkg, raise_if_missing=False)
+        if pkg_info and is_gfxarch_package(pkg_info, enable_kpack):
+            return True
+    return False
 
 
 ################### Package Variant Builders #######################
@@ -506,22 +561,62 @@ def parse_input_package_list(pkg_name, artifact_dir):
     return pkg_list, skipped_list
 
 
-def create_package_config(args: argparse.Namespace) -> PackageConfig:
+def create_package_config(args: argparse.Namespace, pkg_list: list) -> PackageConfig:
     """Create PackageConfig from command-line arguments.
 
     Parses and validates input arguments to build the configuration
     object used throughout the packaging process.
 
+    Validation is aware of what the selected packages actually need:
+    - Packages with an "Artifactory" entry require real content artifacts, so an
+      empty/incorrect --artifacts-dir is treated as a fatal error.
+    - Gfxarch packages require a target architecture, so failing to determine one
+      (no --target and nothing auto-detectable) is fatal.
+    - A pure metapackage selection needs neither, so these checks are relaxed to
+      warnings (a metapackage can legitimately be built from a sparse artifacts dir).
+
     Parameters:
         args: Parsed command-line arguments
+        pkg_list: Resolved list of package names selected for the build
 
     Returns:
         PackageConfig: Fully populated configuration object
 
     Raises:
-        ValueError: If version string is invalid or package type is unsupported
+        ValueError: If version string is invalid, package type is unsupported, or
+            the artifacts/targets required by the selected packages are missing.
     """
     dest_dir = Path(args.dest_dir).expanduser().resolve()
+    artifacts_dir = Path(args.artifacts_dir).resolve()
+
+    # Auto-detect kpack from manifest if not explicitly requested via --enable-kpack.
+    # Resolved before validation since it affects gfxarch detection.
+    if not args.enable_kpack:
+        args.enable_kpack = load_kpack_from_manifest(artifacts_dir)
+        if args.enable_kpack:
+            print(
+                "Detected KPACK_SPLIT_ARTIFACTS in manifest — producing host + device packages"
+            )
+
+    # Determine what the selected packages actually require.
+    needs_artifacts = selection_needs_content_artifacts(pkg_list)
+    needs_targets = selection_needs_targets(pkg_list, args.enable_kpack)
+
+    # Scan the artifacts directory once (also validates that it exists).
+    catalog = build_artifact_catalog(artifacts_dir)
+    has_content = bool(catalog.artifact_names)
+
+    # Validate that the directory actually contains exploded artifacts. This is
+    # only fatal when a selected package needs real content; a metapackage-only
+    # selection may legitimately run against a sparse artifacts directory.
+    if needs_artifacts and not has_content:
+        raise ValueError(
+            f"No artifacts found in --artifacts-dir: {artifacts_dir}. "
+            "Expected exploded artifact subdirectories named "
+            "'<name>_<component>_<target_family>' (each with an artifact_manifest.txt). "
+            "Did you point at the parent of the artifacts directory by mistake? "
+            "Provide the correct --artifacts-dir, or select only metapackages."
+        )
 
     # Determine target architectures
     if args.target:
@@ -529,14 +624,23 @@ def create_package_config(args: argparse.Namespace) -> PackageConfig:
         normalized_targets = normalize_target_list(args.target)
     else:
         # Auto-detect from artifact directory
-        normalized_targets = get_all_target_families(args.artifacts_dir)
-        if not normalized_targets:
-            print(
-                f"No GFX architectures found in artifact directory: {args.artifacts_dir}. "
-                "Either provide --target explicitly or ensure artifacts are present."
+        normalized_targets = sorted(catalog.all_target_families)
+        if normalized_targets:
+            print(f"Auto-detected GFX architectures: {normalized_targets}")
+        elif needs_targets:
+            # Gfxarch packages were selected but no target could be determined.
+            raise ValueError(
+                f"No GFX architectures found in artifact directory: {artifacts_dir}. "
+                "The selected packages include architecture-specific (gfxarch) packages "
+                "that require a target. Either provide --target explicitly or ensure "
+                "architecture-specific artifacts are present in --artifacts-dir."
             )
         else:
-            print(f"Auto-detected GFX architectures: {normalized_targets}")
+            # No gfxarch packages selected (e.g. metapackage-only build): not fatal.
+            print(
+                f"No GFX architectures found in artifact directory: {artifacts_dir}; "
+                "proceeding because no gfxarch packages were selected."
+            )
 
     # Output packaging architecture list to GitHub Actions
     github_output = os.environ.get("GITHUB_OUTPUT")
@@ -544,15 +648,6 @@ def create_package_config(args: argparse.Namespace) -> PackageConfig:
         with open(github_output, "a", encoding="utf-8") as f:
             targets_str = ",".join(normalized_targets)
             f.write(f"PACKAGING_ARCH_LIST={targets_str}\n")
-
-    # Auto-detect kpack from manifest if not explicitly requested via --enable-kpack
-    artifacts_dir = Path(args.artifacts_dir).resolve()
-    if not args.enable_kpack:
-        args.enable_kpack = load_kpack_from_manifest(artifacts_dir)
-        if args.enable_kpack:
-            print(
-                "Detected KPACK_SPLIT_ARTIFACTS in manifest — producing host + device packages"
-            )
 
     # Configure architecture based on multi-arch mode
     if args.enable_kpack:
@@ -592,7 +687,7 @@ def create_package_config(args: argparse.Namespace) -> PackageConfig:
         )
 
     return PackageConfig(
-        artifacts_dir=Path(args.artifacts_dir).resolve(),
+        artifacts_dir=artifacts_dir,
         dest_dir=dest_dir,
         pkg_type=pkg_type,
         rocm_version=args.rocm_version,
@@ -606,19 +701,20 @@ def create_package_config(args: argparse.Namespace) -> PackageConfig:
 
 
 def run(args: argparse.Namespace):
-    # Create configuration from arguments
-    config = create_package_config(args)
-
-    # Clean the packaging build directories
-    cleanup_packaging_environment(config)
-
-    pkg_list, skipped_list = parse_input_package_list(
-        args.pkg_names, config.artifacts_dir
-    )
+    # Resolve the package list first so configuration validation can reason about
+    # whether the selected packages actually need artifacts and/or targets.
+    artifacts_dir = Path(args.artifacts_dir).resolve()
+    pkg_list, skipped_list = parse_input_package_list(args.pkg_names, artifacts_dir)
 
     if not pkg_list:
         print("Error: No packages found to build. Package list is empty.")
         sys.exit(1)
+
+    # Create configuration from arguments (validates artifacts/targets vs selection)
+    config = create_package_config(args, pkg_list)
+
+    # Clean the packaging build directories
+    cleanup_packaging_environment(config)
 
     current_pkg_idx = 0
     try:
