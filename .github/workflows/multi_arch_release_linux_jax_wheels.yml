@@ -56,11 +56,10 @@ on:
         type: string
         default: ""
 
+run-name: Release Linux JAX Wheels (${{ inputs.release_type }}, ${{ inputs.rocm_version }}, Multiarch)
 
 permissions:
   contents: read
-
-run-name: Multi-Arch Release Linux JAX Wheels (${{ inputs.release_type }}, ${{ inputs.rocm_version }}, Multiarch)
 
 jobs:
   build_jax_wheels:
