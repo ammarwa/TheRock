@@ -54,7 +54,7 @@ on:
         description: "Package index URL for the multi-arch release bucket."
         value: ${{ jobs.build_jax_wheels.outputs.package_index_url }}
 
-vgb Build Multi-Arch Linux JAX Wheels (${{ inputs.release_type }}, ${{ inputs.rocm_version }}, Multiarch)
+run-name: Build Multi-Arch Linux JAX Wheels (${{ inputs.release_type }}, ${{ inputs.rocm_version }}, Multiarch)
 
 
 permissions:
