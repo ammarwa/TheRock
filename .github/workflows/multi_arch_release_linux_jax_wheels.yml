@@ -11,16 +11,17 @@ name: Multi-Arch Release Linux JAX Wheels
 on:
   workflow_call:
     inputs:
+      release_type:
+        description: 'Release type. Currently restricted to dev.'
+        type: string
+        default: dev
+        required: true
       rocm_version:
         description: ROCm package version to build against.
         type: string
         required: true
       tar_url:
         description: URL to the TheRock tarball used for the build.
-        type: string
-        required: true
-      release_type:
-        description: 'Release type; selects the release lane.'
         type: string
         required: true
       repository:
@@ -28,31 +29,31 @@ on:
         type: string
         default: ""
       ref:
-        description: "Branch, tag, or SHA to checkout. Defaults to the triggering ref."
+        description: "Branch, tag, or SHA to checkout."
         type: string
         default: ""
   workflow_dispatch:
     inputs:
-      rocm_version:
-        description: ROCm package version to build against.
-        type: string
-        required: true
-      tar_url:
-        description: URL to the TheRock tarball used for the build.
-        type: string
-        required: true
       release_type:
         description: 'Release type; developer-triggered jobs should use "dev"'
         type: choice
         options:
           - dev
         default: dev
+      rocm_version:
+        description: ROCm package version to build against.
+        type: string
+        required: true
+      tar_url:
+        description: URL to the TheRock tarball used for the build.
+        type: string
+        required: true
       repository:
         description: "Repository to checkout. Defaults to github.repository."
         type: string
         default: ""
       ref:
-        description: "Branch, tag, or SHA to checkout. Defaults to the triggering ref."
+        description: "Branch, tag, or SHA to checkout"
         type: string
         default: ""
 

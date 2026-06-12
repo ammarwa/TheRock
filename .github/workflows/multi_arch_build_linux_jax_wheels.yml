@@ -136,6 +136,13 @@ jobs:
           release_type: ${{ inputs.release_type }}
 
       - name: Upload JAX wheels to release bucket
-        id: publish-jax-wheels
+        id: publish_jax_wheels
         run: |
-         echo "Upload JAX wheels to release bucket"
+          python build_tools/github_actions/publish_jax_to_release_bucket.py \
+            --source-dir="${{ env.PACKAGE_DIST_DIR }}" \
+            --release-type="${{ inputs.release_type }}"
+
+      - name: Verify package index output
+        run: |
+          test -n "${{ steps.publish_jax_wheels.outputs.package_index_url }}"
+
