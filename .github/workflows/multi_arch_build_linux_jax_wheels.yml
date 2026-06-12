@@ -4,7 +4,7 @@
 # Reusable single-build workflow for the Linux JAX wheel flow.
 #
 # This workflow is called once per release matrix cell from
-# test_linux_jax_wheels.yml.
+# test_linux_jax_wheels_partial.yml
 #
 # Built shape:
 #   - One build/ci_build invocation for one python_version and jax_ref
@@ -226,7 +226,7 @@ jobs:
     permissions:
       contents: read
       packages: read
-    uses: ./.github/workflows/test_linux_jax_wheels.yml
+    uses: ./.github/workflows/test_linux_jax_wheels_partial.yml
     with:
       amdgpu_family: ${{ inputs.amdgpu_family }}
       package_index_url: ${{ needs.build_jax_wheels.outputs.package_index_url }}

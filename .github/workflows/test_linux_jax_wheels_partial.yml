@@ -181,3 +181,63 @@ jobs:
       - name: Install base JAX test requirements
         run: |
           pip install -r external-builds/jax/requirements-jax.txt
+
+      - name: Configure ROCm from TheRock tarball
+        run: |
+          DEST="/opt/rocm-${{ inputs.rocm_version }}"
+
+          python build_tools/install_rocm_from_artifacts.py \
+            --release "${{ inputs.rocm_version }}" \
+            --artifact-group "${{ inputs.amdgpu_family }}" \
+            --output-dir "${DEST}"
+
+          ln -sfn "${DEST}" /opt/rocm
+
+      - name: Determine JAX package versions
+        run: |
+          if [ -n "${{ inputs.jax_plugin_version }}" ] && [ -n "${{ inputs.jax_version }}" ]; then
+            echo "JAX_VERSION=${{ inputs.jax_version }}" >> "$GITHUB_ENV"
+            echo "JAXLIB_VERSION=${{ inputs.jaxlib_version }}" >> "$GITHUB_ENV"
+            echo "JAX_PLUGIN_VERSION=${{ inputs.jax_plugin_version }}" >> "$GITHUB_ENV"
+            echo "JAX_PJRT_VERSION=${{ inputs.jax_pjrt_version }}" >> "$GITHUB_ENV"
+          else
+            pip install packaging
+
+            python build_tools/github_actions/compute_jax_package_version.py \
+              --rocm-version "${{ inputs.rocm_version }}" \
+              --jax-requirements rocm-jax/build/requirements.txt
+          fi
+
+      - name: Install JAX wheels from package index
+        run: |
+          echo "Installing from:"
+          echo "  ${WHEEL_INDEX_URL}"
+
+          pip install \
+            --index-url "${WHEEL_INDEX_URL}" \
+            "jax_rocm7_plugin==${JAX_PLUGIN_VERSION}" \
+            "jax_rocm7_pjrt==${JAX_PJRT_VERSION}"
+
+          if [ -n "${JAXLIB_VERSION}" ]; then
+            pip install \
+              --index-url "${WHEEL_INDEX_URL}" \
+              "jaxlib==${JAXLIB_VERSION}"
+
+            pip install "jax==${JAX_VERSION}"
+          else
+            pip install \
+              "jax==${JAX_VERSION}" \
+              "jaxlib==${JAX_VERSION}"
+          fi
+
+      - name: Run JAX tests
+        env:
+          JAX_PLATFORMS: rocm
+          HIP_DEVICE_LIB_PATH: /opt/rocm/lib/llvm/amdgcn/bitcode
+          JAX_ROCM_PLUGIN_INTERNAL_BITCODE_PATH: /opt/rocm/lib/llvm/amdgcn/bitcode
+          JAX_ROCM_PLUGIN_INTERNAL_LLD_PATH: /opt/rocm/lib/llvm/bin
+        run: |
+          pytest jax/tests/multi_device_test.py -q --log-cli-level=INFO
+          pytest jax/tests/core_test.py -q --log-cli-level=INFO
+          pytest jax/tests/util_test.py -q --log-cli-level=INFO
+          pytest jax/tests/scipy_stats_test.py -q --log-cli-level=INFO
