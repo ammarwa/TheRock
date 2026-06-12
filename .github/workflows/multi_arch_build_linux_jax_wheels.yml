@@ -71,6 +71,7 @@ run-name: Build Multi-Arch Linux JAX Wheels (${{ inputs.release_type }}, ${{ inp
 permissions:
   contents: read
   id-token: write
+  packages: read
 
 jobs:
   build_jax_wheels:

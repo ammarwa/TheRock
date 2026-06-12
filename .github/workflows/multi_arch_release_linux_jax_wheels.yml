@@ -85,6 +85,7 @@ jobs:
     permissions:
       id-token: write
       contents: read
+      packages: read
     uses: ./.github/workflows/multi_arch_build_linux_jax_wheels.yml
     with:
       python_version: ${{ matrix.python_version }}
