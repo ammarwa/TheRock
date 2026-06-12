@@ -12,9 +12,9 @@ on:
   workflow_call:
     inputs:
       release_type:
-        description: "Release type. Currently restricted to dev."
+        description: 'Release type: "dev", "nightly", or "prerelease".'
         type: string
-        default: dev
+        required: true
       rocm_version:
         description: "ROCm package version to build against."
         type: string
@@ -61,6 +61,7 @@ permissions:
   contents: read
 
 run-name: Multi-Arch Release Linux JAX Wheels (${{ inputs.release_type }}, ${{ inputs.rocm_version }}, Multiarch)
+
 jobs:
   build_jax_wheels:
     name: Build | py ${{ matrix.python_version }} | jax ${{ matrix.jax_ref }}
