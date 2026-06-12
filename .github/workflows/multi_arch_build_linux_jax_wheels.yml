@@ -9,8 +9,8 @@
 # Built shape:
 #   - One build/ci_build invocation for one python_version and jax_ref
 #     matrix cell.
-#   - Uploads the resulting wheels to the multi-arch release bucket,
-#     matching the PyTorch pattern.
+#   - Uploads the resulting wheels to the multi-arch release bucket.
+#   - Runs the JAX test subset against the published multi-arch index.
 
 name: Multi-Arch Build Linux JAX Wheels
 
@@ -41,6 +41,10 @@ on:
         description: "Release type."
         type: string
         required: true
+      test_runs_on:
+        description: "Runner label to use for JAX tests."
+        type: string
+        default: "linux-gfx942-1gpu-core42-ossci-rocm"
       repository:
         description: "Repository to checkout. Defaults to github.repository."
         type: string
@@ -53,9 +57,16 @@ on:
       package_index_url:
         description: "Package index URL for the multi-arch release bucket."
         value: ${{ jobs.build_jax_wheels.outputs.package_index_url }}
+      jax_version:
+        value: ${{ jobs.build_jax_wheels.outputs.jax_version }}
+      jaxlib_version:
+        value: ${{ jobs.build_jax_wheels.outputs.jaxlib_version }}
+      jax_plugin_version:
+        value: ${{ jobs.build_jax_wheels.outputs.jax_plugin_version }}
+      jax_pjrt_version:
+        value: ${{ jobs.build_jax_wheels.outputs.jax_pjrt_version }}
 
 run-name: Build Multi-Arch Linux JAX Wheels (${{ inputs.release_type }}, ${{ inputs.rocm_version }}, Multiarch)
-
 
 permissions:
   contents: read
@@ -67,8 +78,13 @@ jobs:
     runs-on: ${{ github.repository_owner == 'ROCm' && 'azure-linux-scale-rocm' || 'ubuntu-24.04' }}
     outputs:
       package_index_url: ${{ steps.publish_jax_wheels.outputs.package_index_url }}
+      jax_version: ${{ steps.write_jax_versions.outputs.jax_version }}
+      jaxlib_version: ${{ steps.write_jax_versions.outputs.jaxlib_version }}
+      jax_plugin_version: ${{ steps.write_jax_versions.outputs.jax_plugin_version }}
+      jax_pjrt_version: ${{ steps.write_jax_versions.outputs.jax_pjrt_version }}
     env:
       PACKAGE_DIST_DIR: ${{ github.workspace }}/rocm-jax/jax_rocm_plugin/wheelhouse
+
     steps:
       - name: Checkout TheRock
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
@@ -111,7 +127,7 @@ jobs:
             echo "SOURCE_ARG=" >> "$GITHUB_ENV"
           fi
 
-      - name: Build JAX wheels
+      - name: Build JAX Wheels
         working-directory: rocm-jax
         env:
           ROCM_VERSION: ${{ inputs.rocm_version }}
@@ -144,6 +160,40 @@ jobs:
             --source-dir="${{ env.PACKAGE_DIST_DIR }}" \
             --release-type="${{ inputs.release_type }}"
 
-      - name: Verify package index output
-        run: |
-          test -n "${{ steps.publish_jax_wheels.outputs.package_index_url }}"
+  generate_target_to_run:
+    name: Generate target_to_run
+    runs-on: ubuntu-24.04
+    outputs:
+      test_runs_on: ${{ steps.configure.outputs.test-runs-on }}
+      bypass_tests_for_releases: ${{ steps.configure.outputs.bypass_tests_for_releases }}
+    steps:
+      - name: Checking out repository
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Generating target to run
+        id: configure
+        env:
+          TARGET: gfx94X-dcgpu
+          PLATFORM: linux
+        run: python ./build_tools/github_actions/configure_target_run.py
+
+  test_jax_wheels:
+    needs: [build_jax_wheels, generate_target_to_run]
+    name: Test JAX wheels | py ${{ inputs.python_version }} | jax ${{ inputs.jax_ref }}
+    permissions:
+      contents: read
+      packages: read
+    uses: ./.github/workflows/test_multi_arch_linux_jax_wheels.yml
+    with:
+      package_index_url: ${{ needs.build_jax_wheels.outputs.package_index_url }}
+      rocm_version: ${{ inputs.rocm_version }}
+      tar_url: ${{ inputs.tar_url }}
+      python_version: ${{ inputs.python_version }}
+      repository: ${{ inputs.repository || github.repository }}
+      ref: ${{ inputs.ref }}
+      jax_ref: ${{ inputs.jax_ref }}
+      jax_version: ${{ needs.build_jax_wheels.outputs.jax_version }}
+      jaxlib_version: ${{ needs.build_jax_wheels.outputs.jaxlib_version }}
+      jax_plugin_version: ${{ needs.build_jax_wheels.outputs.jax_plugin_version }}
+      jax_pjrt_version: ${{ needs.build_jax_wheels.outputs.jax_pjrt_version }}
+      test_runs_on: ${{ needs.generate_target_to_run.outputs.test_runs_on }}
