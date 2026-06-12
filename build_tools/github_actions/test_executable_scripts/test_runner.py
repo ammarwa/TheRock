@@ -185,6 +185,16 @@ COMPONENT_OVERRIDES = {
             ],
         },
     },
+    # rocgdb ships its CTestTestfile.cmake (and the test_rocgdb.py launcher
+    # it invokes) inside its own testsuite tree, which TheRock installs
+    # verbatim to tests/rocgdb/gdb/testsuite/. Point ctest there.
+    # bin/rocgdb is the rocgdb wrapper *script*, not a directory, so the
+    # default THEROCK_BIN_DIR/<component> location does not apply. The
+    # CTestTestfile.cmake and test_rocgdb.py are owned by the ROCgdb repo
+    # (paired branch users/dravindr/tf_rocgdb); TheRock stays agnostic.
+    "rocgdb": {
+        "test_dir": ["tests", "rocgdb", "gdb", "testsuite"],
+    },
 }
 
 
